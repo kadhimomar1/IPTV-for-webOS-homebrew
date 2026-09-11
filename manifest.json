@@ -1,0 +1,14 @@
+{
+  "id": "com.odyssey.webos.iptv",
+  "title": "IPTV for webOS",
+  "version": "0.1.0",
+  "appDescription": "IPTV player for LG webOS.",
+  "iconUri": "https://raw.githubusercontent.com/kadhimomar1/IPTV-for-webOS-homebrew/main/icon.png",
+  "sourceUrl": "https://github.com/ladepensy/IPTV-for-webOS",
+  "rootRequired": false,
+  "ipkUrl": "https://github.com/ladepensy/IPTV-for-webOS/releases/download/v0.1.0/com.odyssey.webos.iptv_0.1.0_all.ipk",
+  "ipkHash": {
+    "sha256": "d6ca7a67c7c97850872580974ee5cd739f374bec7d75739038a0f1502f16099c"
+  },
+  "ipkSize": 132020
+}
