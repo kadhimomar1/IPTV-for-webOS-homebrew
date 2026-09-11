@@ -1,0 +1,96 @@
+name: Update IPTV Manifest
+
+on:
+  schedule:
+    - cron: "*/30 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Get latest IPTV release
+        id: release
+        run: |
+          RELEASE=$(curl -fsSL \
+            -H "Accept: application/vnd.github+json" \
+            "https://api.github.com/repos/ladepensy/IPTV-for-webOS/releases/latest")
+
+          TAG=$(echo "$RELEASE" | jq -r '.tag_name')
+
+          IPK=$(echo "$RELEASE" | jq -r \
+            '.assets[] | select(.name | test("^com\\.odyssey\\.webos\\.iptv_[0-9.]+_all\\.ipk$")) | .browser_download_url' | head -n 1)
+
+          NAME=$(echo "$RELEASE" | jq -r \
+            '.assets[] | select(.name | test("^com\\.odyssey\\.webos\\.iptv_[0-9.]+_all\\.ipk$")) | .name' | head -n 1)
+
+          if [ -z "$IPK" ] || [ "$IPK" = "null" ]; then
+            echo "No IPTV webOS IPK found."
+            exit 1
+          fi
+
+          VERSION="${TAG#v}"
+
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "ipk=$IPK" >> "$GITHUB_OUTPUT"
+          echo "name=$NAME" >> "$GITHUB_OUTPUT"
+
+      - name: Download IPK
+        run: |
+          curl -fL \
+            "${{ steps.release.outputs.ipk }}" \
+            -o app.ipk
+
+      - name: Calculate SHA256 and size
+        id: data
+        run: |
+          SHA256=$(sha256sum app.ipk | awk '{print $1}')
+          SIZE=$(stat -c%s app.ipk)
+
+          echo "sha256=$SHA256" >> "$GITHUB_OUTPUT"
+          echo "size=$SIZE" >> "$GITHUB_OUTPUT"
+
+      - name: Update manifest
+        env:
+          VERSION: ${{ steps.release.outputs.version }}
+          IPK: ${{ steps.release.outputs.ipk }}
+          SHA256: ${{ steps.data.outputs.sha256 }}
+          SIZE: ${{ steps.data.outputs.size }}
+        run: |
+          cat > manifest.json <<EOF
+          {
+            "id": "com.odyssey.webos.iptv",
+            "title": "IPTV for webOS",
+            "version": "$VERSION",
+            "appDescription": "IPTV player for LG webOS.",
+            "iconUri": "https://raw.githubusercontent.com/kadhimomar1/IPTV-for-webOS-homebrew/main/icon.png",
+            "sourceUrl": "https://github.com/ladepensy/IPTV-for-webOS",
+            "rootRequired": false,
+            "ipkUrl": "$IPK",
+            "ipkHash": {
+              "sha256": "$SHA256"
+            },
+            "ipkSize": $SIZE
+          }
+          EOF
+
+      - name: Commit changes
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git add manifest.json
+
+          if git diff --cached --quiet; then
+            echo "No changes."
+          else
+            git commit -m "Update IPTV manifest"
+            git push
+          fi
